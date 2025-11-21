@@ -9,8 +9,7 @@ from pymongo import MongoClient
 from streamlit_autorefresh import st_autorefresh
 import subprocess
 
-# ---------------------------------------------------------
-# Page configuration
+# Page config
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="Streaming Data Dashboard",
@@ -18,8 +17,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ---------------------------------------------------------
-# Custom UI Styling (professional pastel blue)
+# UI code (pwede to i-edit)
 # ---------------------------------------------------------
 st.markdown("""
     <style>
@@ -49,8 +47,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# ---------------------------------------------------------
-# Sidebar: configuration panel
+# Sidebar config panel
 # ---------------------------------------------------------
 def setup_sidebar():
     st.sidebar.title("Dashboard Controls")
@@ -67,7 +64,7 @@ def setup_sidebar():
         value="streaming-data"
     )
 
-    # MongoDB configuration
+    # MongoDB config
     st.sidebar.subheader("MongoDB Configuration")
     mongo_uri = st.sidebar.text_input(
         "MongoDB URI",
@@ -92,7 +89,6 @@ def setup_sidebar():
         "mongo_collection": mongo_collection
     }
 
-# ---------------------------------------------------------
 # Real-time fallback sample data
 # ---------------------------------------------------------
 def generate_sample_data():
@@ -106,7 +102,6 @@ def generate_sample_data():
         "sensor_id": ["sensor_1"] * 100
     })
 
-# ---------------------------------------------------------
 # Kafka consumer for real-time data
 # ---------------------------------------------------------
 def consume_kafka_data(config):
@@ -133,7 +128,7 @@ def consume_kafka_data(config):
     messages = []
     start = time.time()
 
-    # Poll Kafka for 4 seconds or until 10 messages
+    # Poll Kafka- 4s / hanggang 10 mess
     while time.time() - start < 4 and len(messages) < 10:
         batch = consumer.poll(timeout_ms=1000)
         for _, msgs in batch.items():
@@ -152,8 +147,7 @@ def consume_kafka_data(config):
     else:
         return generate_sample_data()
 
-# ---------------------------------------------------------
-# Query historical data from MongoDB
+# Query historical data from mongodb
 # ---------------------------------------------------------
 def query_historical_data(config, time_range, metric_filter):
     try:
@@ -179,7 +173,7 @@ def query_historical_data(config, time_range, metric_filter):
         if not docs:
             return generate_sample_data()
 
-        # Convert to DataFrame
+        # Convert to df
         df = pd.DataFrame(docs)
         df["timestamp"] = pd.to_datetime(df["timestamp"])
         df = df.sort_values("timestamp")
@@ -188,13 +182,12 @@ def query_historical_data(config, time_range, metric_filter):
     except Exception:
         return generate_sample_data()
 
-# ---------------------------------------------------------
-# Real-time dashboard tab
+# Real time dashboard tab
 # ---------------------------------------------------------
 def display_real_time_view(config, refresh_interval):
     st.header("Real-Time Streaming")
 
-    # Auto-refresh indicator
+    # Auto-refresh 
     state = st.session_state.refresh_state
     st.info(f"Auto-refresh: {state['auto_refresh']} | Interval: {refresh_interval}s")
 
@@ -226,7 +219,6 @@ def display_real_time_view(config, refresh_interval):
     with st.expander("Raw Data"):
         st.dataframe(df, height=250)
 
-# ---------------------------------------------------------
 # Historical dashboard tab
 # ---------------------------------------------------------
 def display_historical_view(config):
@@ -251,7 +243,6 @@ def display_historical_view(config):
     st.subheader("Dataset")
     st.dataframe(df, height=300)
 
-# ---------------------------------------------------------
 # Main app
 # ---------------------------------------------------------
 def main():
