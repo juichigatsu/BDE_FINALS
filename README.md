@@ -103,12 +103,3 @@ Collection: **historical_data**
 ### 2. Launch the Dashboard
 
     streamlit run app.py
-
-## Project Files
-
-  File               Description
-  ------------------ ----------------------------------------------------
-  app.py             Streamlit dashboard (real-time + historical views)
-  producer.py        Kafka Producer + MongoDB writer
-  requirements.txt   Python package list
-  README.md          Documentation
