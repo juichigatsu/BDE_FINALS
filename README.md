@@ -8,10 +8,8 @@ This project implements a complete streaming analytics system using Apache Kafka
 Architecture Overview
 Real-Time Pipeline
 Kafka Producer → Kafka Broker → Streamlit Dashboard (Real-Time View)
-
 Historical Pipeline
 Kafka Producer → MongoDB (Storage) → Streamlit Dashboard (Historical View)
-
 
 Components
 1. Producer (producer.py)
@@ -36,11 +34,11 @@ sensor_id
 Sends data to Kafka.
 
 
-Automatically writes each record to MongoDB for long-term storage.
+Writes each record to MongoDB for historical storage.
 
 
 2. Dashboard (app.py)
-Provides two main views:
+Two main views are provided:
 Real-Time Streaming
 Consumes messages from Kafka.
 
@@ -64,13 +62,13 @@ Reads stored messages from MongoDB.
 Supports:
 
 
-Time-range filtering
+Time range filtering
 
 
 Metric filtering
 
 
-Aggregation options
+Aggregation (raw, hourly, daily)
 
 
 Displays:
@@ -87,54 +85,44 @@ Summary statistics
 
 
 Requirements
-Install project dependencies:
+Install dependencies using:
 pip install -r requirements.txt
-
 
 Setup Instructions
 1. Create a Conda Environment
 conda create -n bigdata python=3.10.13
-conda activate bigdata
-
+ conda activate bigdata
 2. Install Dependencies
 pip install -r requirements.txt
-
 3. Start Kafka
-You must download and extract Apache Kafka before running these:
-# Start ZooKeeper (if using Kafka 3.5 or below)
-bin/zookeeper-server-start.sh config/zookeeper.properties
-
-# Start Kafka broker
-bin/kafka-server-start.sh config/server.properties
-
+You must download and extract Kafka before running these:
+Start ZooKeeper (if needed):
+ bin/zookeeper-server-start.sh config/zookeeper.properties
+Start Kafka broker:
+ bin/kafka-server-start.sh config/server.properties
 
 MongoDB Setup
-Verify MongoDB is running:
+Ensure MongoDB is running:
 systemctl status mongodb
-
 Database name used:
-streamingdb
-
+ streamingdb
 Collection name:
-historical_data
-
+ historical_data
 
 Running the System
 1. Start the Kafka Producer
 python producer.py
-
 2. Launch the Dashboard
 streamlit run app.py
-
 
 Project Files
 File
 Description
 app.py
-Streamlit dashboard (real-time + historical pipeline)
+Streamlit dashboard (real-time + historical views)
 producer.py
 Kafka Producer + MongoDB writer
 requirements.txt
-Python package requirements
+Python package list
 README.md
-Project overview and documentation
+Documentation
