@@ -6,8 +6,7 @@ from kafka import KafkaProducer
 from pymongo import MongoClient
 import argparse
 
-# ---------------------------------------------------------
-# Create Kafka Producer
+# kafka producer
 # ---------------------------------------------------------
 def create_kafka_producer(broker):
     return KafkaProducer(
@@ -15,16 +14,14 @@ def create_kafka_producer(broker):
         value_serializer=lambda v: json.dumps(v).encode("utf-8")
     )
 
-# ---------------------------------------------------------
-# Create MongoDB client
+# mongodb client (wala na hadoop)
 # ---------------------------------------------------------
 def create_mongo_client(uri, db_name, coll_name):
     client = MongoClient(uri)
     collection = client[db_name][coll_name]
     return collection
 
-# ---------------------------------------------------------
-# Fetch API data (example: Open-Meteo weather API)
+# api data fetching
 # ---------------------------------------------------------
 def fetch_weather(lat, lon):
     url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
@@ -33,8 +30,7 @@ def fetch_weather(lat, lon):
     value = data["current_weather"]["temperature"]
     return value
 
-# ---------------------------------------------------------
-# Main producer logic
+# producer logic (main)
 # ---------------------------------------------------------
 def run_producer(broker, topic, mongo_uri, db, coll, lat, lon, interval):
     producer = create_kafka_producer(broker)
@@ -54,10 +50,10 @@ def run_producer(broker, topic, mongo_uri, db, coll, lat, lon, interval):
                 "sensor_id": "sensor_1"
             }
 
-            # Send to Kafka
+            # >kafka
             producer.send(topic, doc)
 
-            # Write to MongoDB
+            # w > mongodb
             collection.insert_one(doc)
 
             print(f"Sent: {doc}")
@@ -71,8 +67,7 @@ def run_producer(broker, topic, mongo_uri, db, coll, lat, lon, interval):
             print(f"Error: {e}")
             time.sleep(5)
 
-# ---------------------------------------------------------
-# Argument parser for CLI use
+# CLI parse
 # ---------------------------------------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Kafka + MongoDB Data Producer")
