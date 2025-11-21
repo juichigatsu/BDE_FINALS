@@ -1,148 +1,103 @@
-import os
-import time
-import json
-import argparse
-import tempfile
-import subprocess
-from datetime import datetime
-
 import requests
+import json
+import time
+from datetime import datetime
 from kafka import KafkaProducer
-from kafka.errors import KafkaError
+from pymongo import MongoClient
+import argparse
 
-# Optional: use pyarrow for HDFS writes
-try:
-    import pyarrow as pa
-    import pyarrow.fs as pafs
-    PYARROW_AVAILABLE = True
-except Exception:
-    PYARROW_AVAILABLE = False
-
-DEFAULT_BROKER = os.environ.get("KAFKA_BROKER", "localhost:9092")
-DEFAULT_TOPIC = os.environ.get("KAFKA_TOPIC", "streaming-data")
-DEFAULT_HDFS_DIR = os.environ.get("HDFS_DIR", "/user/streaming/dashboard")
-DEFAULT_LAT = os.environ.get("LAT", "14.5995")
-DEFAULT_LON = os.environ.get("LON", "120.9842")
-DEFAULT_INTERVAL = int(os.environ.get("INTERVAL", "15"))
-FLUSH_TO_HDFS_EVERY = 10
-
-OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
-
-def fetch_current_weather(lat, lon):
-    params = {
-        "latitude": lat,
-        "longitude": lon,
-        "current_weather": "true",
-    }
-    r = requests.get(OPEN_METEO_URL, params=params, timeout=10)
-    r.raise_for_status()
-    return r.json()
-
-def build_message(lat, lon, api_result):
-    now_iso = datetime.utcnow().isoformat() + "Z"
-    current = api_result.get("current_weather", {})
-    temp = current.get("temperature")
-
-    return {
-        "timestamp": now_iso,
-        "value": float(temp) if temp is not None else None,
-        "metric_type": "temperature",
-        "sensor_id": f"open-meteo_{lat}_{lon}"
-    }
-
-def write_batch_to_hdfs_jsonlines(batch, hdfs_dir):
-    if not batch:
-        return
-
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.jsonl') as tmp:
-        local_path = tmp.name
-        for obj in batch:
-            tmp.write(json.dumps(obj) + "\n")
-
-    if PYARROW_AVAILABLE:
-        try:
-            hdfs = pafs.HadoopFileSystem()
-            filename = f"{hdfs_dir.rstrip('/')}/stream_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.jsonl"
-            with hdfs.open_output_stream(filename) as out:
-                with open(local_path, "rb") as f:
-                    out.write(f.read())
-            print(f"[hdfs] Wrote {len(batch)} records via pyarrow: {filename}")
-            os.remove(local_path)
-            return
-        except Exception as e:
-            print(f"[hdfs] pyarrow error: {e}")
-
-    try:
-        subprocess.run(["hdfs", "dfs", "-mkdir", "-p", hdfs_dir], check=False)
-        remote_path = f"{hdfs_dir.rstrip('/')}/stream_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.jsonl"
-        subprocess.run(["hdfs", "dfs", "-put", "-f", local_path, remote_path], check=True)
-        print(f"[hdfs] Wrote {len(batch)} records via CLI: {remote_path}")
-        os.remove(local_path)
-        return
-    except Exception as e:
-        print(f"[hdfs] CLI write failed: {e} - file kept at {local_path}")
-
-def run_producer(broker, topic, hdfs_dir, lat, lon, interval):
-    producer = KafkaProducer(
+# ---------------------------------------------------------
+# Create Kafka Producer
+# ---------------------------------------------------------
+def create_kafka_producer(broker):
+    return KafkaProducer(
         bootstrap_servers=[broker],
-        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-        retries=5
+        value_serializer=lambda v: json.dumps(v).encode("utf-8")
     )
 
-    print(f"Producer running → broker={broker}, topic={topic}, HDFS={hdfs_dir}")
+# ---------------------------------------------------------
+# Create MongoDB client
+# ---------------------------------------------------------
+def create_mongo_client(uri, db_name, coll_name):
+    client = MongoClient(uri)
+    collection = client[db_name][coll_name]
+    return collection
 
-    counter = 0
-    batch = []
+# ---------------------------------------------------------
+# Fetch API data (example: Open-Meteo weather API)
+# ---------------------------------------------------------
+def fetch_weather(lat, lon):
+    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
+    response = requests.get(url, timeout=5)
+    data = response.json()
+    value = data["current_weather"]["temperature"]
+    return value
 
-    try:
-        while True:
-            try:
-                api_resp = fetch_current_weather(lat, lon)
-            except Exception as e:
-                print(f"[api] failed → {e}")
-                time.sleep(interval)
-                continue
+# ---------------------------------------------------------
+# Main producer logic
+# ---------------------------------------------------------
+def run_producer(broker, topic, mongo_uri, db, coll, lat, lon, interval):
+    producer = create_kafka_producer(broker)
+    collection = create_mongo_client(mongo_uri, db, coll)
 
-            msg = build_message(lat, lon, api_resp)
-            if msg["value"] is None:
-                print("[warn] no temperature — skipping")
-                time.sleep(interval)
-                continue
+    print(f"Producer started. Sending data to Kafka topic '{topic}' and MongoDB '{db}.{coll}'...")
+    print("Press CTRL+C to stop.\n")
 
-            try:
-                future = producer.send(topic, value=msg)
-                result = future.get(timeout=10)
-                print(f"[kafka] sent {msg}")
-            except KafkaError as e:
-                print(f"[kafka] error → {e}")
+    while True:
+        try:
+            value = fetch_weather(lat, lon)
 
-            batch.append(msg)
-            counter += 1
+            doc = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "value": value,
+                "metric_type": "temperature",
+                "sensor_id": "sensor_1"
+            }
 
-            if counter % FLUSH_TO_HDFS_EVERY == 0:
-                write_batch_to_hdfs_jsonlines(batch, hdfs_dir)
-                batch = []
+            # Send to Kafka
+            producer.send(topic, doc)
 
+            # Write to MongoDB
+            collection.insert_one(doc)
+
+            print(f"Sent: {doc}")
             time.sleep(interval)
 
-    except KeyboardInterrupt:
-        print("Stopping producer...")
-        if batch:
-            write_batch_to_hdfs_jsonlines(batch, hdfs_dir)
-        producer.flush()
-        producer.close()
+        except KeyboardInterrupt:
+            print("\nProducer stopped by user.")
+            break
 
+        except Exception as e:
+            print(f"Error: {e}")
+            time.sleep(5)
+
+# ---------------------------------------------------------
+# Argument parser for CLI use
+# ---------------------------------------------------------
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--broker", default=DEFAULT_BROKER)
-    parser.add_argument("--topic", default=DEFAULT_TOPIC)
-    parser.add_argument("--hdfs-dir", default=DEFAULT_HDFS_DIR)
-    parser.add_argument("--lat", default=DEFAULT_LAT)
-    parser.add_argument("--lon", default=DEFAULT_LON)
-    parser.add_argument("--interval", type=int, default=DEFAULT_INTERVAL)
+    parser = argparse.ArgumentParser(description="Kafka + MongoDB Data Producer")
+
+    parser.add_argument("--broker", default="localhost:9092", help="Kafka broker address")
+    parser.add_argument("--topic", default="streaming-data", help="Kafka topic")
+
+    parser.add_argument("--mongo-uri", default="mongodb://localhost:27017/", help="MongoDB URI")
+    parser.add_argument("--db", default="streamingdb", help="MongoDB database name")
+    parser.add_argument("--coll", default="historical_data", help="MongoDB collection name")
+
+    parser.add_argument("--lat", type=float, default=14.5995, help="Latitude for API")
+    parser.add_argument("--lon", type=float, default=120.9842, help="Longitude for API")
+
+    parser.add_argument("--interval", type=int, default=15, help="Seconds between messages")
+
     args = parser.parse_args()
 
-    run_producer(args.broker, args.topic, args.hdfs-dir, args.lat, args.lon, args.interval)
-
-
-
+    run_producer(
+        broker=args.broker,
+        topic=args.topic,
+        mongo_uri=args.mongo_uri,
+        db=args.db,
+        coll=args.coll,
+        lat=args.lat,
+        lon=args.lon,
+        interval=args.interval
+    )

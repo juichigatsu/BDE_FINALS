@@ -1,83 +1,157 @@
-# 🚀 Streaming Data Dashboard: Project Guide
+VIEW THE FULL DOCUMENT HERE:
+https://docs.google.com/document/d/1rDA7j3Es5jJAVoFW9drAd8gJyoJQkv-Lzxg9rLv76YI/edit?usp=sharing
 
-This project requires building a big data streaming dashboard using **Kafka** and **Streamlit**, featuring separate real-time and historical data views.
+Streaming Data Dashboard — Big Data Final Project
+Overview
+This project implements a complete real-time big data streaming pipeline using:
+Apache Kafka (Producer + Consumer)
 
-## 🎯 Architecture & Components
 
-A **dual-pipeline** architecture separates live streaming from long-term storage and analysis.
+MongoDB (Historical storage)
 
-| Pipeline | Flow | Output |
-| :--- | :--- | :--- |
-| **Real-time** | Kafka $\rightarrow$ Streamlit (Live Consumer) | `📈 Real-time Streaming View` |
-| **Historical** | Kafka $\rightarrow$ **HDFS OR MongoDB** $\rightarrow$ Streamlit (Query) | `📊 Historical Data View` |
 
-### Mandatory Components
-* Kafka Producer/Consumer.
-* **HDFS or MongoDB** integration.
-* Two-page Streamlit dashboard with charts.
-* Robust error handling.
+Streamlit (Dashboard)
 
----
 
-## 💻 Technical Implementation Tasks
+Python (Data processing + API integration)
 
-### 1. Data Producer (`producer.py`)
-Create a Kafka Producer that fetches real data from an **existing Application Programming Interface (API)** (e.g., a public weather API, stock market API, etc.).
 
-**Required Data Schema Fields:**
-* `timestamp` (ISO format)
-* `value` (Numeric)
-* `metric_type` (String)
-* `sensor_id` (String)
+The system is designed to ingest live data from an external API, visualize it in real time, and store it for historical analysis.
 
-### 2. Dashboard (`app.py`)
-Implement the Streamlit logic:
-* `consume_kafka_data()`: Real-time processing.
-* `query_historical_data()`: Data retrieval from storage.
-* Create interactive widgets (filters, time-range selector) for the Historical View.
+Architecture
+1. Real-time Pipeline
+API → Kafka Producer → Kafka Topic → Streamlit Consumer → Real-time Dashboard
 
-### 3. Storage Integration
-Implement data writing and querying for **ONE** of the following: **HDFS** or **MongoDB**.
+2. Historical Pipeline
+Kafka Producer → MongoDB → Streamlit Query → Historical Dashboard
 
----
+The dashboard is split into two views:
+View
+Source
+Description
+Real-time Streaming
+Kafka
+Displays the last incoming messages live
+Historical Data
+MongoDB
+Long-term stored records with filtering
 
-## 🏃‍♂️ Setup & Execution
 
-### Prerequisites
-Python 3.8+, Apache Kafka, HDFS **OR** MongoDB.
+Features
+✅ Kafka Producer
+Fetches live data from a public API
 
-### Setup
-1. **Setup environment**
-    - Download miniconda
-    - Create your python environment
-    ```bash
-    conda create -n bigdata python=3.10.13
-    ```
-2.  **Clone Repo & Install:**
-    ```bash
-    git clone [REPO_URL]
-    conda activate bigdata
-    pip install -r requirements.txt
-    ```
-3.  **Configure:** Set up Kafka and your chosen Storage System.
-4.  **Optional Environment File (`.env`):** Use for connection details.
 
-### Execution
-1.  **Start Kafka Broker** (and Controller).
-2.  **Start Producer:**
-    ```bash
-    python producer.py
-    ```
-3.  **Launch Dashboard:**
-    ```bash
-    streamlit run app.py
-    ```
+Sends structured messages to Kafka topic
 
----
 
-## 📦 Deliverables
-Submit the following files:
-* `app.py`
-* `producer.py`
-* `requirements.txt`
-* `README.md`
+Stores all messages into MongoDB simultaneously
+
+
+✅ Streamlit Dashboard
+Real-time line chart
+
+
+Metrics summary boxes
+
+
+Historical filtering (range, metric type, aggregation)
+
+
+MongoDB querying
+
+
+Auto-refresh system
+
+
+✅ MongoDB Integration
+Database: streamingdb
+
+
+Collection: historical_data
+
+
+Fast queries based on timestamps
+
+
+Fully JSON-based record storage
+
+
+✅ Error Handling
+Kafka connection retries
+
+
+Fallback sample data
+
+
+MongoDB connection validation
+
+
+Invalid timestamp handling
+
+
+
+Project Structure
+BDE_FINALS/
+│── app.py               # Streamlit dashboard
+│── producer.py          # Kafka producer + API ingestor
+│── requirements.txt     # Python dependencies
+│── README.md            # Documentation
+
+
+Installation & Setup
+1. Create Virtual Environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+2. Install Requirements
+pip install -r requirements.txt
+
+
+Start Kafka
+Open a new terminal inside the Kafka folder:
+cd ~/kafka
+bin/zookeeper-server-start.sh config/zookeeper.properties
+
+Open another terminal:
+cd ~/kafka
+bin/kafka-server-start.sh config/server.properties
+
+
+Run the Producer
+python3 producer.py
+
+This begins sending real-time API data to:
+Kafka topic (streaming-data)
+
+
+MongoDB (streamingdb → historical_data)
+
+
+
+Run the Dashboard
+streamlit run app.py
+
+Your browser will open automatically.
+
+MongoDB Setup
+Your MongoDB service must be running:
+sudo systemctl status mongod
+
+Database + collection automatically created:
+Database: streamingdb
+
+
+Collection: historical_data
+
+
+
+Data Schema
+All records follow this format:
+{
+  "timestamp": "2025-01-01T12:00:00Z",
+  "value": 23.7,
+  "metric_type": "temperature",
+  "sensor_id": "sensor_1"
+}
+
